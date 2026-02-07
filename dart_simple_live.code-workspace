@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../dart_simple_live"
+		},
+		{
+			"path": "../pure_live"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {}
+}

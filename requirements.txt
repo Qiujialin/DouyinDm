@@ -1,0 +1,8 @@
+flask==3.0.0
+flask-socketio==5.3.5
+flask-cors==4.0.0
+websocket-client==1.7.0
+protobuf==4.25.1
+execjs==1.5.1
+python-engineio==4.8.0
+python-socketio==5.10.0

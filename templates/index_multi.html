@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>抖音弹幕实时监控 - 多直播间并发版</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+            background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 500px 1fr;
+            gap: 20px;
+            height: calc(100vh - 40px);
+        }
+
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            flex-shrink: 0;
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 20px;
+        }
+
+        .header .subtitle {
+            color: #666;
+            font-size: 11px;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            max-width: 800px;
+        }
+
+        .section-divider {
+            height: 1px;
+            background: #e2e8f0;
+            margin: 8px 0;
+        }
+
+        .section-label {
+            font-size: 11px;
+            color: #718096;
+            font-weight: 600;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .input-group {
+            flex: 1 1 auto;
+            min-width: 200px;
+            max-width: 450px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 4px;
+            color: #666;
+            font-size: 13px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #4A90E2;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #4A90E2;
+            color: white;
+        }
+
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            background: transparent;
+            border-radius: 0;
+            padding: 0 0 15px 0;
+            box-shadow: none;
+            flex-shrink: 0;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 15px;
+        }
+
+        .status-badges {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .badge-info {
+            background: #4299e1;
+            color: white;
+        }
+
+        .badge-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .badge-warning {
+            background: #ed8936;
+            color: white;
+        }
+
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .rooms-panel {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .rooms-panel h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .room-item {
+            background: #f7fafc;
+            border-left: 4px solid #4A90E2;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .room-item.running {
+            border-left-color: #48bb78;
+            background: #f0fff4;
+        }
+
+        .room-title {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 5px;
+        }
+
+        .room-owner {
+            font-size: 12px;
+            color: #718096;
+            margin-bottom: 5px;
+        }
+
+        .room-id {
+            font-size: 11px;
+            color: #a0aec0;
+            margin-bottom: 10px;
+        }
+
+        .room-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .btn-small {
+            padding: 5px 12px;
+            font-size: 12px;
+        }
+
+        .danmaku-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .danmaku-container h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 20px;
+            flex-shrink: 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #4A90E2;
+        }
+
+        .danmaku-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .danmaku-item {
+            background: #f7fafc;
+            border-left: 4px solid #4A90E2;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .danmaku-item:hover {
+            background: #edf2f7;
+        }
+
+        .danmaku-content {
+            flex: 1;
+        }
+
+        .danmaku-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+
+        .room-badge {
+            background: #4A90E2;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .danmaku-message {
+            color: #2d3748;
+            font-size: 16px;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .danmaku-time {
+            color: #a0aec0;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .copy-btn {
+            padding: 8px 16px;
+            background: #4A90E2;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .copy-btn:hover {
+            background: #357ABD;
+        }
+
+        .copy-btn.copied {
+            background: #48bb78;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #a0aec0;
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #4A90E2;
+            border-radius: 4px;
+        }
+
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+
+            .left-panel {
+                overflow-y: visible;
+            }
+
+            .danmaku-container {
+                height: 600px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 左侧面板 -->
+        <div class="left-panel">
+            <!-- 头部控制区 -->
+            <div class="header">
+                <h1>🎬 抖音弹幕监控</h1>
+                <div class="subtitle">
+                    支持同时监控多个直播间，实时显示所有弹幕<br>
+                    💡 提示：可以随时设置/修改过滤器，对所有直播间立即生效
+                </div>
+                <div class="controls">
+                    <!-- 第一行：添加直播间 -->
+                    <div class="section-label">📺 添加直播间</div>
+                    <div class="control-row">
+                        <div class="input-group">
+                            <label for="webRid">直播间 ID (Web RID)</label>
+                            <input type="text" id="webRid" placeholder="例如: 4253196531">
+                        </div>
+                        <button class="btn btn-primary" onclick="addRoom()">➕ 添加直播间</button>
+                    </div>
+
+                    <div class="section-divider"></div>
+
+                    <!-- 第二行：过滤器设置 -->
+                    <div class="section-label">🔍 过滤器设置（全局生效）</div>
+                    <div class="control-row">
+                        <div class="input-group">
+                            <label for="filterPattern">正则表达式过滤</label>
+                            <input type="text" id="filterPattern" placeholder="例如: 王者荣耀【[^】]+】.*?今天(9[0-9]{2}|[1-9]\d{3,})块">
+                        </div>
+                        <button class="btn btn-primary" onclick="setFilter()">⚙️ 设置过滤</button>
+                    </div>
+
+                    <div class="section-divider"></div>
+
+                    <!-- 第三行：批量操作 -->
+                    <div class="section-label">🎮 批量操作</div>
+                    <div class="control-row">
+                        <button class="btn btn-success" onclick="startAll()">▶️ 启动全部</button>
+                        <button class="btn btn-danger" onclick="stopAll()">⏹️ 停止全部</button>
+                        <button class="btn btn-primary" onclick="exportConfig()">📤 导出配置</button>
+                        <button class="btn btn-primary" onclick="document.getElementById('importFile').click()">📥 导入配置</button>
+                        <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importConfig(event)">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 直播间列表 -->
+            <div class="rooms-panel">
+                <h2>📺 直播间列表</h2>
+                <div id="roomsList">
+                    <div class="empty-state">
+                        <p>暂无直播间，请添加</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：弹幕显示 -->
+        <div class="danmaku-container">
+            <!-- 状态栏 -->
+            <div class="status">
+                <div class="status-badges">
+                    <span class="status-badge badge-info" id="totalRooms">直播间: 0</span>
+                    <span class="status-badge badge-success" id="runningRooms">运行中: 0</span>
+                    <span class="status-badge badge-warning" id="filterInfo">无过滤</span>
+                    <span class="status-badge badge-info" id="danmakuCount">弹幕: 0</span>
+                </div>
+            </div>
+
+            <h2>💬 实时弹幕 (所有直播间)</h2>
+            <div class="danmaku-list" id="danmakuList">
+                <div class="empty-state">
+                    <p>暂无弹幕，请添加并启动直播间</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let danmakuCount = 0;
+        const maxDanmaku = 50;
+        let rooms = [];
+
+        // Socket.IO 事件
+        socket.on('connect', () => {
+            console.log('已连接到服务器');
+            loadRooms();
+        });
+
+        socket.on('history', (data) => {
+            console.log('收到历史弹幕:', data.danmaku.length);
+            data.danmaku.forEach(danmaku => {
+                addDanmaku(danmaku, false);
+            });
+        });
+
+        socket.on('new_danmaku', (data) => {
+            console.log('新弹幕:', data.message);
+            addDanmaku(data, true);
+        });
+
+        socket.on('rooms_update', (data) => {
+            rooms = data.rooms;
+            updateRoomsList();
+        });
+
+        // 加载直播间列表
+        async function loadRooms() {
+            try {
+                const response = await fetch('/api/rooms');
+                const result = await response.json();
+                rooms = result.rooms;
+                updateRoomsList();
+                updateStatus();
+
+                // 加载当前过滤器状态
+                await loadFilterStatus();
+            } catch (error) {
+                console.error('加载直播间失败:', error);
+            }
+        }
+
+        // 加载过滤器状态
+        async function loadFilterStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const result = await response.json();
+
+                if (result.filter) {
+                    // 更新输入框
+                    document.getElementById('filterPattern').value = result.filter;
+
+                    // 更新状态显示
+                    const displayPattern = result.filter.length > 30
+                        ? result.filter.substring(0, 30) + '...'
+                        : result.filter;
+                    document.getElementById('filterInfo').textContent = `过滤: ${displayPattern}`;
+                    document.getElementById('filterInfo').title = result.filter;
+                } else {
+                    document.getElementById('filterInfo').textContent = '无过滤';
+                    document.getElementById('filterInfo').title = '';
+                }
+            } catch (error) {
+                console.error('加载过滤器状态失败:', error);
+            }
+        }
+
+        // 更新直播间列表显示
+        function updateRoomsList() {
+            const list = document.getElementById('roomsList');
+
+            if (rooms.length === 0) {
+                list.innerHTML = '<div class="empty-state"><p>暂无直播间，请添加</p></div>';
+                return;
+            }
+
+            list.innerHTML = rooms.map(room => `
+                <div class="room-item ${room.is_running ? 'running' : ''}">
+                    <div class="room-title">${escapeHtml(room.title)}</div>
+                    <div class="room-owner">👤 ${escapeHtml(room.owner)}</div>
+                    <div class="room-id">ID: ${room.web_rid}</div>
+                    <div class="room-actions">
+                        ${room.is_running
+                            ? `<button class="btn btn-danger btn-small" onclick="stopRoom('${room.room_id}')">停止</button>`
+                            : `<button class="btn btn-success btn-small" onclick="startRoom('${room.room_id}')">启动</button>`
+                        }
+                        <button class="btn btn-danger btn-small" onclick="removeRoom('${room.room_id}')">移除</button>
+                    </div>
+                </div>
+            `).join('');
+
+            updateStatus();
+        }
+
+        // 更新状态栏
+        function updateStatus() {
+            const runningCount = rooms.filter(r => r.is_running).length;
+            document.getElementById('totalRooms').textContent = `直播间: ${rooms.length}`;
+            document.getElementById('runningRooms').textContent = `运行中: ${runningCount}`;
+            document.getElementById('danmakuCount').textContent = `弹幕: ${danmakuCount}`;
+        }
+
+        // 添加直播间
+        async function addRoom() {
+            const webRid = document.getElementById('webRid').value.trim();
+
+            if (!webRid) {
+                alert('请输入直播间 ID');
+                return;
+            }
+
+            try {
+                // 添加直播间
+                const response = await fetch('/api/add_room', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({web_rid: webRid})
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(`添加成功: ${result.title}`);
+                    document.getElementById('webRid').value = '';
+                    await loadRooms();
+                } else {
+                    alert('添加失败: ' + result.error);
+                }
+            } catch (error) {
+                alert('添加失败: ' + error.message);
+            }
+        }
+
+        // 设置过滤器（独立功能）
+        async function setFilter() {
+            const filterPattern = document.getElementById('filterPattern').value.trim();
+
+            try {
+                const response = await fetch('/api/filter', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({pattern: filterPattern})
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    if (filterPattern) {
+                        // 截断显示过长的正则表达式
+                        const displayPattern = filterPattern.length > 30
+                            ? filterPattern.substring(0, 30) + '...'
+                            : filterPattern;
+                        document.getElementById('filterInfo').textContent = `过滤: ${displayPattern}`;
+                        document.getElementById('filterInfo').title = filterPattern; // 完整内容显示在tooltip
+                        alert(`✅ 过滤器已设置成功！\n\n规则: ${filterPattern}\n\n将对所有直播间生效（包括正在运行的）`);
+                    } else {
+                        document.getElementById('filterInfo').textContent = '无过滤';
+                        document.getElementById('filterInfo').title = '';
+                        alert('✅ 过滤器已清除');
+                    }
+                } else {
+                    alert('❌ 设置失败: ' + result.error);
+                }
+            } catch (error) {
+                alert('❌ 设置失败: ' + error.message);
+            }
+        }
+
+        // 启动指定直播间
+        async function startRoom(roomId) {
+            try {
+                const response = await fetch(`/api/start_room/${roomId}`, {method: 'POST'});
+                const result = await response.json();
+
+                if (result.success) {
+                    await loadRooms();
+                } else {
+                    alert('启动失败: ' + result.error);
+                }
+            } catch (error) {
+                alert('启动失败: ' + error.message);
+            }
+        }
+
+        // 停止指定直播间
+        async function stopRoom(roomId) {
+            try {
+                await fetch(`/api/stop_room/${roomId}`, {method: 'POST'});
+                await loadRooms();
+            } catch (error) {
+                alert('停止失败: ' + error.message);
+            }
+        }
+
+        // 移除直播间
+        async function removeRoom(roomId) {
+            if (!confirm('确定要移除这个直播间吗？')) {
+                return;
+            }
+
+            try {
+                await fetch(`/api/remove_room/${roomId}`, {method: 'POST'});
+                await loadRooms();
+            } catch (error) {
+                alert('移除失败: ' + error.message);
+            }
+        }
+
+        // 启动全部
+        async function startAll() {
+            try {
+                const response = await fetch('/api/start_all', {method: 'POST'});
+                const result = await response.json();
+                await loadRooms();
+
+                if (result.errors.length > 0) {
+                    alert(`部分启动失败:\n${result.errors.map(e => e.error).join('\n')}`);
+                }
+            } catch (error) {
+                alert('启动失败: ' + error.message);
+            }
+        }
+
+        // 停止全部
+        async function stopAll() {
+            try {
+                await fetch('/api/stop_all', {method: 'POST'});
+                await loadRooms();
+            } catch (error) {
+                alert('停止失败: ' + error.message);
+            }
+        }
+
+        // 导出配置
+        async function exportConfig() {
+            try {
+                const response = await fetch('/api/export');
+                const config = await response.json();
+
+                // 创建下载链接
+                const dataStr = JSON.stringify(config, null, 2);
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                const url = URL.createObjectURL(dataBlob);
+
+                // 生成文件名（包含时间戳）
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                const filename = `douyin_config_${timestamp}.json`;
+
+                // 触发下载
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+
+                alert(`✅ 配置已导出到文件: ${filename}\n\n包含:\n- ${config.rooms.length} 个直播间\n- 过滤器: ${config.filter || '无'}`);
+            } catch (error) {
+                alert('导出失败: ' + error.message);
+            }
+        }
+
+        // 导入配置
+        async function importConfig(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const config = JSON.parse(text);
+
+                // 确认导入
+                const roomCount = config.rooms ? config.rooms.length : 0;
+                const filterInfo = config.filter ? `过滤器: ${config.filter.substring(0, 50)}...` : '无过滤器';
+
+                if (!confirm(`确定要导入配置吗？\n\n将导入:\n- ${roomCount} 个直播间\n- ${filterInfo}\n\n注意：已存在的直播间将被跳过`)) {
+                    event.target.value = ''; // 清空文件选择
+                    return;
+                }
+
+                // 发送导入请求
+                const response = await fetch('/api/import', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(config)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    let message = `✅ 导入成功！\n\n`;
+                    message += `- 导入: ${result.imported} 个直播间\n`;
+                    if (result.skipped > 0) {
+                        message += `- 跳过: ${result.skipped} 个（已存在）\n`;
+                    }
+                    if (result.errors.length > 0) {
+                        message += `\n错误:\n${result.errors.join('\n')}`;
+                    }
+
+                    alert(message);
+
+                    // 重新加载页面数据
+                    await loadRooms();
+                } else {
+                    alert('导入失败: ' + result.error);
+                }
+            } catch (error) {
+                alert('导入失败: ' + error.message);
+            } finally {
+                event.target.value = ''; // 清空文件选择
+            }
+        }
+
+        // 添加弹幕到列表
+        function addDanmaku(data, isNew) {
+            const list = document.getElementById('danmakuList');
+
+            // 移除空状态
+            const emptyState = list.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            // 创建弹幕元素
+            const item = document.createElement('div');
+            item.className = 'danmaku-item';
+            item.innerHTML = `
+                <div class="danmaku-content">
+                    <div class="danmaku-header">
+                        <span class="room-badge">${escapeHtml(data.room_title || '未知')}</span>
+                    </div>
+                    <div class="danmaku-message">${escapeHtml(data.message)}</div>
+                    <div class="danmaku-time">${data.timestamp}</div>
+                </div>
+                <button class="copy-btn" onclick="copyMessage(this, '${escapeHtml(data.message)}')">复制</button>
+            `;
+
+            // 添加到列表顶部
+            if (isNew) {
+                list.insertBefore(item, list.firstChild);
+            } else {
+                list.appendChild(item);
+            }
+
+            // 限制最多显示
+            danmakuCount++;
+            if (list.children.length > maxDanmaku) {
+                list.removeChild(list.lastChild);
+            }
+
+            updateStatus();
+        }
+
+        // 复制消息
+        function copyMessage(btn, message) {
+            const textarea = document.createElement('textarea');
+            textarea.innerHTML = message;
+            const decodedMessage = textarea.value;
+
+            navigator.clipboard.writeText(decodedMessage).then(() => {
+                const originalText = btn.textContent;
+                btn.textContent = '已复制';
+                btn.classList.add('copied');
+
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }, 1500);
+            }).catch(err => {
+                alert('复制失败: ' + err);
+            });
+        }
+
+        // HTML 转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 回车键添加
+        document.getElementById('webRid').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                addRoom();
+            }
+        });
+    </script>
+</body>
+</html>

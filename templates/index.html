@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>抖音弹幕实时监控</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .input-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 10px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 24px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #e53e3e;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(245, 101, 101, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-item {
+            display: inline-block;
+            margin-right: 20px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status-running {
+            background: #48bb78;
+            color: white;
+        }
+
+        .status-stopped {
+            background: #cbd5e0;
+            color: #4a5568;
+        }
+
+        .danmaku-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .danmaku-container h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        .danmaku-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .danmaku-item {
+            background: #f7fafc;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .danmaku-item:hover {
+            background: #edf2f7;
+            transform: translateX(5px);
+        }
+
+        .danmaku-content {
+            flex: 1;
+        }
+
+        .danmaku-message {
+            color: #2d3748;
+            font-size: 16px;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .danmaku-time {
+            color: #a0aec0;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .copy-btn {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .copy-btn:hover {
+            background: #5568d3;
+            transform: scale(1.05);
+        }
+
+        .copy-btn:active {
+            transform: scale(0.95);
+        }
+
+        .copy-btn.copied {
+            background: #48bb78;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #a0aec0;
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .stats {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .stat-badge {
+            background: #edf2f7;
+            padding: 5px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            color: #4a5568;
+        }
+
+        /* 滚动条样式 */
+        .danmaku-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .danmaku-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .danmaku-container::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 4px;
+        }
+
+        .danmaku-container::-webkit-scrollbar-thumb:hover {
+            background: #5568d3;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+            }
+
+            .input-group {
+                width: 100%;
+            }
+
+            .btn {
+                width: 100%;
+                margin-top: 10px;
+            }
+
+            .danmaku-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .copy-btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部控制区 -->
+        <div class="header">
+            <h1>🎬 抖音弹幕实时监控</h1>
+            <div class="controls">
+                <div class="input-group">
+                    <label for="webRid">直播间 ID (Web RID)</label>
+                    <input type="text" id="webRid" placeholder="例如: 4253196531" value="4253196531">
+                </div>
+                <div class="input-group">
+                    <label for="filterPattern">正则表达式过滤 (可选)</label>
+                    <input type="text" id="filterPattern" placeholder="例如: 礼物|关注">
+                </div>
+                <button class="btn btn-primary" id="startBtn" onclick="startDanmaku()">启动监控</button>
+                <button class="btn btn-danger" id="stopBtn" onclick="stopDanmaku()" disabled>停止监控</button>
+            </div>
+        </div>
+
+        <!-- 状态栏 -->
+        <div class="status">
+            <span class="status-item status-stopped" id="statusBadge">未运行</span>
+            <div class="stats">
+                <span class="stat-badge" id="roomInfo">等待启动...</span>
+                <span class="stat-badge" id="filterInfo">无过滤</span>
+                <span class="stat-badge" id="countInfo">弹幕: 0</span>
+            </div>
+        </div>
+
+        <!-- 弹幕显示区 -->
+        <div class="danmaku-container">
+            <h2>💬 实时弹幕 (最新20条)</h2>
+            <div class="danmaku-list" id="danmakuList">
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    <p>暂无弹幕，请启动监控</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let danmakuCount = 0;
+        const maxDanmaku = 20;
+
+        // Socket.IO 事件
+        socket.on('connect', () => {
+            console.log('已连接到服务器');
+        });
+
+        socket.on('history', (data) => {
+            console.log('收到历史弹幕:', data.danmaku.length);
+            data.danmaku.forEach(danmaku => {
+                addDanmaku(danmaku, false);
+            });
+        });
+
+        socket.on('new_danmaku', (data) => {
+            console.log('新弹幕:', data.message);
+            addDanmaku(data, true);
+        });
+
+        // 启动监控
+        async function startDanmaku() {
+            const webRid = document.getElementById('webRid').value.trim();
+            const filterPattern = document.getElementById('filterPattern').value.trim();
+
+            if (!webRid) {
+                alert('请输入直播间 ID');
+                return;
+            }
+
+            // 禁用按钮
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('startBtn').textContent = '启动中...';
+
+            try {
+                // 设置过滤器
+                if (filterPattern) {
+                    await fetch('/api/filter', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({pattern: filterPattern})
+                    });
+                    document.getElementById('filterInfo').textContent = `过滤: ${filterPattern}`;
+                } else {
+                    document.getElementById('filterInfo').textContent = '无过滤';
+                }
+
+                // 启动弹幕接收
+                const response = await fetch('/api/start', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({web_rid: webRid})
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    document.getElementById('statusBadge').textContent = '运行中';
+                    document.getElementById('statusBadge').className = 'status-item status-running';
+                    document.getElementById('roomInfo').textContent = `${result.title} - ${result.owner}`;
+                    document.getElementById('startBtn').disabled = true;
+                    document.getElementById('stopBtn').disabled = false;
+                    document.getElementById('startBtn').textContent = '启动监控';
+
+                    // 清空弹幕列表
+                    danmakuCount = 0;
+                    document.getElementById('danmakuList').innerHTML = '';
+                } else {
+                    alert('启动失败: ' + result.error);
+                    document.getElementById('startBtn').disabled = false;
+                    document.getElementById('startBtn').textContent = '启动监控';
+                }
+            } catch (error) {
+                alert('启动失败: ' + error.message);
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('startBtn').textContent = '启动监控';
+            }
+        }
+
+        // 停止监控
+        async function stopDanmaku() {
+            try {
+                await fetch('/api/stop', {method: 'POST'});
+
+                document.getElementById('statusBadge').textContent = '已停止';
+                document.getElementById('statusBadge').className = 'status-item status-stopped';
+                document.getElementById('roomInfo').textContent = '等待启动...';
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+            } catch (error) {
+                alert('停止失败: ' + error.message);
+            }
+        }
+
+        // 添加弹幕到列表
+        function addDanmaku(data, isNew) {
+            const list = document.getElementById('danmakuList');
+
+            // 移除空状态
+            const emptyState = list.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            // 创建弹幕元素
+            const item = document.createElement('div');
+            item.className = 'danmaku-item';
+            item.innerHTML = `
+                <div class="danmaku-content">
+                    <div class="danmaku-message">${escapeHtml(data.message)}</div>
+                    <div class="danmaku-time">${data.timestamp}</div>
+                </div>
+                <button class="copy-btn" onclick="copyMessage(this, '${escapeHtml(data.message)}')">复制</button>
+            `;
+
+            // 添加到列表顶部
+            if (isNew) {
+                list.insertBefore(item, list.firstChild);
+            } else {
+                list.appendChild(item);
+            }
+
+            // 限制最多显示20条
+            danmakuCount++;
+            if (list.children.length > maxDanmaku) {
+                list.removeChild(list.lastChild);
+            }
+
+            // 更新计数
+            document.getElementById('countInfo').textContent = `弹幕: ${danmakuCount}`;
+        }
+
+        // 复制消息
+        function copyMessage(btn, message) {
+            // 解码 HTML 实体
+            const textarea = document.createElement('textarea');
+            textarea.innerHTML = message;
+            const decodedMessage = textarea.value;
+
+            navigator.clipboard.writeText(decodedMessage).then(() => {
+                const originalText = btn.textContent;
+                btn.textContent = '已复制';
+                btn.classList.add('copied');
+
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }, 1500);
+            }).catch(err => {
+                alert('复制失败: ' + err);
+            });
+        }
+
+        // HTML 转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 回车键启动
+        document.getElementById('webRid').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                startDanmaku();
+            }
+        });
+
+        document.getElementById('filterPattern').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                startDanmaku();
+            }
+        });
+    </script>
+</body>
+</html>

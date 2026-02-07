@@ -1,0 +1,10 @@
+[project]
+name = "douyindm"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pyexecjs>=1.5.1",
+    "websocket-client>=1.9.0",
+]
