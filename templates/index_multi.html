@@ -337,15 +337,8 @@
         .danmaku-header {
             display: flex;
             align-items: center;
-            justify-content: space-between;
             gap: 10px;
             margin-bottom: 5px;
-        }
-
-        .danmaku-header-left {
-            display: flex;
-            align-items: center;
-            gap: 10px;
         }
 
         .danmaku-actions {
@@ -877,15 +870,13 @@
             item.innerHTML = `
                 <div class="danmaku-content">
                     <div class="danmaku-header">
-                        <div class="danmaku-header-left">
-                            <span class="room-badge">${escapeHtml(data.room_title || '未知')}</span>
-                        </div>
-                        ${priceBadge}
+                        <span class="room-badge">${escapeHtml(data.room_title || '未知')}</span>
                     </div>
                     <div class="danmaku-message">${escapeHtml(data.message)}</div>
                     <div class="danmaku-time">${data.timestamp}</div>
                 </div>
                 <div class="danmaku-actions">
+                    ${priceBadge}
                     <button class="copy-btn" onclick="copyMessage(this, '${escapeHtml(data.message)}')">复制</button>
                 </div>
             `;
