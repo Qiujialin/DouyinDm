@@ -285,19 +285,15 @@
             background: #f7fafc;
             border-left: 4px solid #4A90E2;
             padding: 15px;
-            padding-right: 80px;
             border-radius: 8px;
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: stretch;
             animation: slideIn 0.3s ease-out;
             position: relative;
         }
 
         .price-badge {
-            position: absolute;
-            top: 8px;
-            right: 8px;
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
             color: white;
             padding: 4px 10px;
@@ -306,6 +302,7 @@
             font-weight: 600;
             box-shadow: 0 2px 6px rgba(245, 87, 108, 0.25);
             animation: pulse 2s ease-in-out infinite;
+            white-space: nowrap;
         }
 
         @keyframes pulse {
@@ -334,14 +331,29 @@
 
         .danmaku-content {
             flex: 1;
-            padding-right: 10px;
+            padding-right: 15px;
         }
 
         .danmaku-header {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 10px;
             margin-bottom: 5px;
+        }
+
+        .danmaku-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .danmaku-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: flex-end;
+            justify-content: flex-start;
         }
 
         .room-badge {
@@ -377,8 +389,6 @@
             font-weight: 600;
             transition: all 0.3s;
             white-space: nowrap;
-            flex-shrink: 0;
-            align-self: center;
         }
 
         .copy-btn:hover {
@@ -424,10 +434,6 @@
                 height: 600px;
             }
 
-            .danmaku-item {
-                padding-right: 70px;
-            }
-
             .copy-btn {
                 padding: 6px 12px;
                 font-size: 11px;
@@ -436,6 +442,10 @@
             .price-badge {
                 font-size: 11px;
                 padding: 3px 8px;
+            }
+
+            .danmaku-content {
+                padding-right: 10px;
             }
         }
     </style>
@@ -865,15 +875,19 @@
             const item = document.createElement('div');
             item.className = 'danmaku-item';
             item.innerHTML = `
-                ${priceBadge}
                 <div class="danmaku-content">
                     <div class="danmaku-header">
-                        <span class="room-badge">${escapeHtml(data.room_title || '未知')}</span>
+                        <div class="danmaku-header-left">
+                            <span class="room-badge">${escapeHtml(data.room_title || '未知')}</span>
+                        </div>
+                        ${priceBadge}
                     </div>
                     <div class="danmaku-message">${escapeHtml(data.message)}</div>
                     <div class="danmaku-time">${data.timestamp}</div>
                 </div>
-                <button class="copy-btn" onclick="copyMessage(this, '${escapeHtml(data.message)}')">复制</button>
+                <div class="danmaku-actions">
+                    <button class="copy-btn" onclick="copyMessage(this, '${escapeHtml(data.message)}')">复制</button>
+                </div>
             `;
 
             // 添加到列表顶部
