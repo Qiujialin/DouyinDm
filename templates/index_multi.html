@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>抖音弹幕实时监控 - 多直播间并发版</title>
+    <title>小马糕弹幕实时监控 - 多直播间并发版</title>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
         * {
@@ -290,6 +290,30 @@
             justify-content: space-between;
             align-items: flex-start;
             animation: slideIn 0.3s ease-out;
+            position: relative;
+        }
+
+        .price-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 700;
+            box-shadow: 0 2px 8px rgba(245, 87, 108, 0.3);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
         }
 
         @keyframes slideIn {
@@ -309,6 +333,7 @@
 
         .danmaku-content {
             flex: 1;
+            padding-right: 100px;
         }
 
         .danmaku-header {
@@ -351,6 +376,9 @@
             font-weight: 600;
             transition: all 0.3s;
             white-space: nowrap;
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
         }
 
         .copy-btn:hover {
@@ -404,7 +432,7 @@
         <div class="left-panel">
             <!-- 头部控制区 -->
             <div class="header">
-                <h1>🎬 抖音弹幕监控</h1>
+                <h1>🎮 小马糕弹幕监控</h1>
                 <div class="subtitle">
                     支持同时监控多个直播间，实时显示所有弹幕<br>
                     💡 提示：可以随时设置/修改过滤器，对所有直播间立即生效
@@ -795,6 +823,16 @@
             }
         }
 
+        // 提取小马糕价格
+        function extractPrice(message) {
+            // 匹配格式：今天XXX块
+            const priceMatch = message.match(/今天(\d+)块/);
+            if (priceMatch) {
+                return parseInt(priceMatch[1]);
+            }
+            return null;
+        }
+
         // 添加弹幕到列表
         function addDanmaku(data, isNew) {
             const list = document.getElementById('danmakuList');
@@ -805,10 +843,15 @@
                 emptyState.remove();
             }
 
+            // 提取价格
+            const price = extractPrice(data.message);
+            const priceBadge = price ? `<span class="price-badge">💰 ${price}块</span>` : '';
+
             // 创建弹幕元素
             const item = document.createElement('div');
             item.className = 'danmaku-item';
             item.innerHTML = `
+                ${priceBadge}
                 <div class="danmaku-content">
                     <div class="danmaku-header">
                         <span class="room-badge">${escapeHtml(data.room_title || '未知')}</span>
