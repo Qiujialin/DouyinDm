@@ -8,6 +8,7 @@ from flask_cors import CORS
 import threading
 import re
 import time
+from datetime import datetime, timezone, timedelta
 import json
 import os
 from collections import deque
@@ -21,6 +22,9 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 # 配置文件路径
 CONFIG_FILE = 'douyin_config.json'
+
+# 北京时区
+BEIJING_TZ = timezone(timedelta(hours=8))
 
 # 全局变量
 rooms = {}  # 存储所有直播间：{room_id: {receiver, thread, info, buffer}}
@@ -108,7 +112,8 @@ class MultiRoomDanmakuReceiver(DouyinDanmaku):
 
         message = chat_msg.content
         username = chat_msg.user.nickName
-        timestamp = time.strftime('%H:%M:%S')
+        # 使用北京时间
+        timestamp = datetime.now(BEIJING_TZ).strftime('%H:%M:%S')
 
         # 应用正则表达式过滤
         if current_filter:
