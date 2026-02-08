@@ -337,6 +337,7 @@
         .danmaku-header {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 10px;
             margin-bottom: 5px;
         }
@@ -347,6 +348,10 @@
             gap: 8px;
             align-items: flex-end;
             justify-content: center;
+        }
+
+        .danmaku-actions-mobile {
+            display: none;
         }
 
         .room-badge {
@@ -440,6 +445,18 @@
             .danmaku-content {
                 padding-right: 10px;
             }
+
+            .danmaku-actions {
+                display: none;
+            }
+
+            .danmaku-actions-mobile {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                align-items: flex-end;
+                justify-content: center;
+            }
         }
     </style>
 </head>
@@ -528,6 +545,10 @@
         let danmakuCount = 0;
         const maxDanmaku = 50;
         let rooms = [];
+
+        // 弹幕去重：使用 Set 存储最近的弹幕消息（保留最近 200 条用于去重）
+        const recentMessages = new Set();
+        const maxRecentMessages = 200;
 
         // Socket.IO 事件
         socket.on('connect', () => {
@@ -850,9 +871,32 @@
             return null;
         }
 
+        // 生成弹幕唯一标识（用于去重）
+        function getDanmakuKey(data) {
+            // 使用房间ID + 消息内容作为唯一标识
+            return `${data.room_id}_${data.message}`;
+        }
+
         // 添加弹幕到列表
         function addDanmaku(data, isNew) {
             const list = document.getElementById('danmakuList');
+
+            // 去重检查
+            const messageKey = getDanmakuKey(data);
+            if (recentMessages.has(messageKey)) {
+                console.log('重复弹幕，已跳过:', data.message);
+                return;
+            }
+
+            // 添加到去重集合
+            recentMessages.add(messageKey);
+
+            // 限制去重集合大小
+            if (recentMessages.size > maxRecentMessages) {
+                // 删除最早的一个（Set 是有序的）
+                const firstKey = recentMessages.values().next().value;
+                recentMessages.delete(firstKey);
+            }
 
             // 移除空状态
             const emptyState = list.querySelector('.empty-state');
@@ -871,12 +915,18 @@
                 <div class="danmaku-content">
                     <div class="danmaku-header">
                         <span class="room-badge">${escapeHtml(data.room_title || '未知')}</span>
+                        <span class="danmaku-actions-mobile">
+                            ${priceBadge}
+                        </span>
                     </div>
                     <div class="danmaku-message">${escapeHtml(data.message)}</div>
                     <div class="danmaku-time">${data.timestamp}</div>
                 </div>
                 <div class="danmaku-actions">
                     ${priceBadge}
+                    <button class="copy-btn" onclick="copyMessage(this, '${escapeHtml(data.message)}')">复制</button>
+                </div>
+                <div class="danmaku-actions-mobile">
                     <button class="copy-btn" onclick="copyMessage(this, '${escapeHtml(data.message)}')">复制</button>
                 </div>
             `;
